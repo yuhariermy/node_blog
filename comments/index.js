@@ -23,7 +23,7 @@ app.post("/posts/:id/comments", async (req, res) => {
   const comments =
     commentsByPostId[req.params.id] /** it should undefined **/ || []; // the empty array should return if undifined
 
-  comments.push({ id: commentId, content: content });
+  comments.push({ id: commentId, content: content, status: "pending" });
   commentsByPostId[req.params.id] = comments;
 
   await axios.post("http://localhost:4005/events", {
@@ -32,14 +32,34 @@ app.post("/posts/:id/comments", async (req, res) => {
       id: commentId,
       content,
       postId: req.params.id,
+      status: "pending",
     },
   });
 
   res.status(200).send(comments);
 });
 
-app.post("/events", (req, res) => {
+app.post("/events", async (req, res) => {
   console.log("Recieved events", req.body.type);
+
+  const { type, data } = req.body;
+
+  if (type === "CommentModerated") {
+    const { id, postId, status } = data;
+    const comments = commentsByPostId[postId];
+    const comment = comments.find((comment) => comment.id === id);
+    comment.status = status;
+
+    await axios.post("http://localhost:4005", {
+      type: "CommentUpdated",
+      data: {
+        id,
+        status,
+        postId,
+        content,
+      },
+    });
+  }
 
   res.send({});
 });
